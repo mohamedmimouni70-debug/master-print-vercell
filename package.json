@@ -1,0 +1,16 @@
+{
+  "name": "master-print-app",
+  "version": "1.0.0",
+  "description": "Master Print - Système de Gestion d'Atelier, Impression & Comptabilité",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
