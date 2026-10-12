@@ -22,6 +22,10 @@
   <!-- SheetJS -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+  <!-- Google Firebase Realtime Cloud Database SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -4262,7 +4266,7 @@ function doGet(e) {
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('sw.js?v=20261010_v99').then(function(reg) {
+        navigator.serviceWorker.register('sw.js?v=20261013_v102').then(function(reg) {
           console.log('Master Print ServiceWorker active:', reg.scope);
         }).catch(function(err) {
           console.log('SW reg error:', err);
@@ -4279,6 +4283,6 @@ function doGet(e) {
   <!-- محرك تسعيرات أوزون إكسبريس الرسمي -->
   <script src="ozone_pricing.js?v=20261010_v99"></script>
   <!-- الملف البرمجي الرئيسي متضمناً قاعدة البيانات الأصلية الحقيقية بالكامل -->
-  <script src="app.js?v=20261012_v101"></script>
+  <script src="app.js?v=20261013_v102"></script>
 </body>
 </html>

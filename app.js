@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ماستر برينت - تدبير الصندوق والمخزون والطلبيات
  * لغة عربية خالصة واستخدام "درهم" وتنسيق متقن
  */
@@ -3389,6 +3389,7 @@ function initApp() {
   if (window.initOzoneCityDatalist) window.initOzoneCityDatalist();
   renderAll();
   initCloudSync();
+  initFirebaseRealtimeSync();
   if (typeof checkUrlQrScanParam === "function") checkUrlQrScanParam();
   lucide.createIcons();
 
@@ -3666,6 +3667,11 @@ function saveData() {
       caisseCount: state.caisse.length,
       stockCount: state.stock.length
     });
+  }
+
+  // مزامنة فورية في نفس اللحظة مع Google Firebase لربط كل الأجهزة
+  if (typeof pushStateToFirebaseCloud === "function") {
+    pushStateToFirebaseCloud();
   }
 
   // حفظ نسخة متزامنة على القرص الصلب لحماية الحسابات في كل المتصفحات (أمان ضد الحفظ الفارغ)
@@ -11011,6 +11017,145 @@ window.quickFillConsommable = quickFillConsommable;
 
 function closeTransactionModal() {
   document.getElementById("modal-transaction").classList.add("hidden");
+}
+
+// =============================================================================
+// GOOGLE FIREBASE REALTIME CLOUD DATABASE ENGINE
+// مزامنة فورية حية في نفس اللحظة بين الحاسوب والهاتف لـ Master Print
+// =============================================================================
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAa3aBXSMWVn3M2F_1eCfhuSTkjitj8MG4",
+  authDomain: "master-print.firebaseapp.com",
+  databaseURL: "https://master-print-default-rtdb.firebaseio.com",
+  projectId: "master-print",
+  storageBucket: "master-print.firebasestorage.app",
+  messagingSenderId: "278634939876",
+  appId: "1:278634939876:web:b66bcde4f0ec0eb874f3f1",
+  measurementId: "G-J3NZ9RYZ0B"
+};
+
+let firebaseDbRef = null;
+let isRemoteFirebaseSync = false;
+let firebaseSyncDebounceTimer = null;
+let isFirebaseConnected = false;
+
+function initFirebaseRealtimeSync() {
+  if (typeof firebase === "undefined") {
+    console.warn("Firebase SDK not loaded");
+    return;
+  }
+  try {
+    if (!firebase.apps || !firebase.apps.length) {
+      firebase.initializeApp(FIREBASE_CONFIG);
+    }
+    const rtdb = firebase.database();
+    firebaseDbRef = rtdb.ref("master_print_db");
+    window.firebaseDbRef = firebaseDbRef;
+
+    // مراقبة الاتصال بالسحابة
+    const connectedRef = rtdb.ref(".info/connected");
+    connectedRef.on("value", snap => {
+      isFirebaseConnected = (snap.val() === true);
+      updateFirebaseStatusUI(isFirebaseConnected, isFirebaseConnected ? "سحابي مباشر (Firebase) 🟢" : "أوفلاين (محلي) 🟡");
+    });
+
+    // استماع حي وفوري لأي تعديل جديد قادم من التيليفون أو البيسي الآخر
+    firebaseDbRef.on("value", snapshot => {
+      const data = snapshot.val();
+      if (data && Array.isArray(data.orders) && data.orders.length > 0) {
+        // حماية ضد التكرار الحلقي
+        isRemoteFirebaseSync = true;
+
+        state.orders = data.orders;
+        state.caisse = data.caisse || [];
+        state.stock = data.stock || [];
+        if (data.settings && Object.keys(data.settings).length > 0) {
+          state.settings = Object.assign({}, state.settings || {}, data.settings);
+        }
+        if (data.stockQrTokens) {
+          state.stockQrTokens = data.stockQrTokens;
+        }
+
+        // الحفظ في الذاكرة المحلية كـ كاش احتياطي للعمل أوفلاين
+        localStorage.setItem("mp_orders", JSON.stringify(state.orders));
+        localStorage.setItem("mp_caisse", JSON.stringify(state.caisse));
+        localStorage.setItem("mp_stock", JSON.stringify(state.stock));
+        localStorage.setItem("mp_settings", JSON.stringify(state.settings));
+        localStorage.setItem("mp_stock_qr_tokens", JSON.stringify(state.stockQrTokens || []));
+
+        renderAll();
+        updateFirebaseStatusUI(true, "سحابي مباشر (Firebase) 🟢");
+
+        setTimeout(() => {
+          isRemoteFirebaseSync = false;
+        }, 300);
+      } else if (!data && state.orders && state.orders.length > 0) {
+        // إذا كانت السحابة فارغة لأول مرة، نرفع البيانات الحقيقية الحالية إليها فوراً
+        console.log("Firebase is empty, populating initial authentic database...");
+        pushStateToFirebaseCloud(true);
+      }
+    }, error => {
+      console.warn("Firebase listener error:", error);
+      if (error && error.message && error.message.includes("permission_denied")) {
+        updateFirebaseStatusUI(false, "تنبيه: قواعد الأمان Rules مقفلة 🔒");
+      }
+    });
+
+  } catch (err) {
+    console.error("Firebase init failed:", err);
+  }
+}
+
+function pushStateToFirebaseCloud(immediate = false) {
+  if (isRemoteFirebaseSync || !firebaseDbRef) return;
+  clearTimeout(firebaseSyncDebounceTimer);
+
+  const doPush = () => {
+    try {
+      if (!state.orders || state.orders.length === 0) return;
+      const payload = {
+        orders: state.orders || [],
+        caisse: state.caisse || [],
+        stock: state.stock || [],
+        settings: state.settings || {},
+        stockQrTokens: state.stockQrTokens || [],
+        lastUpdated: Date.now()
+      };
+      firebaseDbRef.set(payload).then(() => {
+        updateFirebaseStatusUI(true, "تم الحفظ بالسحابة ⚡");
+        setTimeout(() => {
+          if (isFirebaseConnected) updateFirebaseStatusUI(true, "سحابي مباشر (Firebase) 🟢");
+        }, 2000);
+      }).catch(err => {
+        console.warn("Firebase push error:", err);
+      });
+    } catch (e) {
+      console.warn("pushStateToFirebaseCloud error:", e);
+    }
+  };
+
+  if (immediate) {
+    doPush();
+  } else {
+    firebaseSyncDebounceTimer = setTimeout(doPush, 300);
+  }
+}
+
+function updateFirebaseStatusUI(isLive, labelText) {
+  const dot = document.getElementById("sync-status-dot");
+  const text = document.getElementById("sync-status-text");
+  const modeStatus = document.getElementById("sync-mode-status");
+  if (dot) {
+    dot.className = isLive ? "w-2 h-2 rounded-full bg-emerald-500 animate-pulse" : "w-2 h-2 rounded-full bg-amber-500";
+  }
+  if (text) {
+    text.textContent = labelText || (isLive ? "سحابي مباشر (Firebase) 🟢" : "أوفلاين 🟡");
+  }
+  if (modeStatus) {
+    modeStatus.textContent = isLive ? "سحابي مباشر متزامن (Live Firebase)" : "محلي (أوفلاين)";
+    modeStatus.className = isLive ? "text-xs font-black text-emerald-600 mt-1 block" : "text-xs font-black text-amber-600 mt-1 block";
+  }
 }
 
 // ==============================================

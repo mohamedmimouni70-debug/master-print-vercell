@@ -1,5 +1,5 @@
 // Master Print Service Worker - Offline-First Engine
-const CACHE_NAME = 'master-print-v101';
+const CACHE_NAME = 'master-print-v102';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -11,7 +11,9 @@ const STATIC_ASSETS = [
   './manifest.json',
   'https://cdn.tailwindcss.com',
   'https://unpkg.com/lucide@latest',
-  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
+  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+  'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js'
 ];
 
 // Install: Precache Core Assets
